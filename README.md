@@ -29,10 +29,25 @@ python3 app.py --db ./data.db --port 8317
 - `POST /api/items`
 - `GET /api/items/{id}`
 - `POST /api/items/{id}/records`
+- `POST /api/items/{id}/records/{record_id}/close`
+- `POST /api/items/{id}/update`，必须提交`expected_version`
 - `POST /api/items/{id}/transition`，必须提交`expected_version`
+- `GET /api/work-orders`，支持`item_id`、`status`、`batch_no`、`historical`过滤
+- `POST /api/work-orders/batches`，按`batch_no`幂等批次提交
+- `POST /api/work-orders/{id}/start`，开工并锁定队伍与现场记录
+- `POST /api/work-orders/backfill`，旧数据回填排程依据并标为历史
 - `GET /api/audit`
 
 允许角色：assessor, structural_engineer, review_board, viewer。风险分值和人员密度共同影响排序；审核通过前必须完成评估、设计和施工证据登记。
+
+## 加固工单
+
+工单以排程依据（严重程度、未关闭记录数、优先级、项目版本）快照下发。
+
+- 鉴定项目严重程度变化或未关闭记录增减后，未开工工单的依据失效并按当前项目重排；已开工工单保留队伍与现场记录，不动。
+- 两位调度员提交同一批次时，后到者按当前版本重新确认：未开工工单刷新依据，已开工工单不被覆盖。
+- 批次写入失败后按原`batch_no`重试，`(batch_no, item_id)`唯一约束保证已落下的工单不重复。
+- 旧数据升级调用`POST /api/work-orders/backfill`，按现有项目回填排程依据并标为历史（`is_historical=1`），重复执行不产生重复工单。
 
 ## 测试
 

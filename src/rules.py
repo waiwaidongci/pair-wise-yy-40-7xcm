@@ -20,3 +20,17 @@ def validate_transition(current,target):
     if not can_transition(current,target): raise ConflictError(f"不能从{current}转换到{target}")
 def completion_blockers(target,open_records): return ["仍有未关闭事项"] if target in TERMINAL_STATES and open_records>0 else []
 def role_for_transition(target): return set(TRANSITION_ROLES.get(target,[]))
+WORK_ORDER_STATES=['pending','in_progress']
+DISPATCH_ROLES=set(['assessor','structural_engineer'])
+BACKFILL_BATCH_NO='BACKFILL'
+def scheduling_basis(severity,quantity,threshold,open_records,version):
+    return {
+        'severity': severity,
+        'open_records': int(open_records),
+        'priority': priority_score(severity,quantity,threshold,int(open_records)),
+        'version': int(version),
+    }
+def basis_is_stale(order,basis):
+    return (order['status']=='pending'
+            and (order['basis_severity']!=basis['severity']
+                 or order['basis_open_records']!=basis['open_records']))
