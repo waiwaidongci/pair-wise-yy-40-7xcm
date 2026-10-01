@@ -84,6 +84,23 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"items": service.list_items(role)})
+                elif path == "/api/schedule":
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, service.schedule_status(role))
+                elif path == "/api/work-orders":
+                    actor, role = self._identity()
+                    del actor
+                    query = parse_qs(urlparse(self.path).query)
+                    item_id = query.get("item_id", [None])[0]
+                    status = query.get("status", [None])[0]
+                    self._json(200, {"work_orders": service.list_work_orders(
+                        role, int(item_id) if item_id else None, status)})
+                elif path.startswith("/api/work-orders/"):
+                    order_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, service.get_work_order(order_id, role))
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     actor, role = self._identity()
@@ -110,9 +127,28 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path == "/api/schedule/batches":
+                    result = service.commit_batch(body, actor, role)
+                    self._json(200 if result["replayed"] else 201, result)
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/close"):
+                    parts = path.split("/")
+                    if len(parts) != 7 or parts[4] != "records":
+                        self._json(404, {"error": "not_found"})
+                        return
+                    self._json(200, service.close_record(
+                        int(parts[3]), int(parts[5]), actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/reassess"):
+                    item_id = int(path.split("/")[3])
+                    self._json(200, service.reassess_item(item_id, body, actor, role))
+                elif path.startswith("/api/work-orders/") and path.endswith("/start"):
+                    order_id = int(path.split("/")[3])
+                    self._json(200, service.start_work_order(order_id, actor, role))
+                elif path.startswith("/api/work-orders/") and path.endswith("/logs"):
+                    order_id = int(path.split("/")[3])
+                    self._json(201, service.add_work_order_log(order_id, body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
                     item_id = int(path.split("/")[3])
                     target = body.get("target")
